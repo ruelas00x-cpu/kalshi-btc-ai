@@ -1,0 +1,116 @@
+//@version=6
+indicator("Kalshi BTC | v3.7 Early + Live Recheck (TV proxy)", shorttitle="Kalshi BTC v3.7", overlay=true, max_labels_count=500)
+// BTCUSD 1-minute chart only. Every decision is made on a CLOSED candle.
+// Contract slots assumed aligned to UTC :00/:15/:30/:45. TradingView feed is NOT Kalshi settlement index.
+secret = input.string("CHANGE_ME", "Webhook shared secret (dashboard bridge)")
+earlyScore = input.int(4, "Early call minimum |score| (3m)", minval=3, maxval=6)
+allowVeryEarly = input.bool(false, "Experimental: strongest calls at 2m")
+laterScore = input.int(3, "Later call minimum |score| (5-6m)", minval=2, maxval=6)
+allowMinute4 = input.bool(true, "Allow strong call at 4 minutes")
+rangeBars = input.int(24, "Range levels (completed candles)", minval=12, maxval=90)
+useReversalGuard = input.bool(true, "Guard against chasing exhausted moves")
+showLevels = input.bool(true, "Show prior range levels")
+showBoard = input.bool(true, "Show status panel")
+
+is1m = timeframe.isminutes and timeframe.multiplier == 1
+slotMinute = (hour(time, "Etc/UTC") * 60 + minute(time, "Etc/UTC")) % 15
+newSlot = is1m and slotMinute == 0
+elapsed = slotMinute + 1  // closes: 2=3 elapsed, 3=4, 4=5, 5=6
+var float tvSlotOpen = na
+var string slotCall = "PENDING"
+var int calledAt = na
+var int nUp = 0
+var int nDown = 0
+var int nWait = 0
+if newSlot
+    tvSlotOpen := open
+    slotCall := "PENDING"
+    calledAt := na
+
+ema9 = ta.ema(close, 9)
+ema20 = ta.ema(close, 20)
+vwapValue = ta.vwap(hlc3)
+rsiValue = ta.rsi(close, 14)
+atrValue = ta.atr(14)
+volBase = ta.sma(volume, 20)
+volRatio = not na(volBase) and volBase > 0 ? volume / volBase : 0.0
+[diPlus, diMinus, adx] = ta.dmi(14, 14)
+// Only LAST COMPLETE 5-minute candle, no future information.
+trend5 = request.security(syminfo.tickerid, "5", (ta.ema(close, 9) > ta.ema(close, 20) ? 1 : -1)[1], lookahead=barmerge.lookahead_on)
+rangeHigh = ta.highest(high[1], rangeBars)
+rangeLow = ta.lowest(low[1], rangeBars)
+rangeMid = (rangeHigh + rangeLow) / 2.0
+inRange = not na(atrValue) and atrValue > 0 and adx < 22 and (rangeHigh - rangeLow) < 5.0 * atrValue
+nearResistance = atrValue > 0 and close < rangeHigh + atrValue * 0.15 and close > rangeHigh - atrValue * 0.55
+nearSupport = atrValue > 0 and close > rangeLow - atrValue * 0.15 and close < rangeLow + atrValue * 0.55
+breakUp = atrValue > 0 and close > rangeHigh + atrValue * 0.15
+breakDown = atrValue > 0 and close < rangeLow - atrValue * 0.15
+// The original v3 score is retained as the baseline.
+above = close > ema9 and ema9 > ema20 and close > vwapValue
+below = close < ema9 and ema9 < ema20 and close < vwapValue
+bullPullback = ta.lowest(low, 3) <= ema9 * 1.0005 and close > ema9 and close > open
+bearPullback = ta.highest(high, 3) >= ema9 * 0.9995 and close < ema9 and close < open
+rawScore = (above ? 2 : below ? -2 : 0) + trend5 + (rsiValue > 55 ? 1 : rsiValue < 45 ? -1 : 0) + (close > tvSlotOpen ? 1 : close < tvSlotOpen ? -1 : 0) + (bullPullback ? 1 : bearPullback ? -1 : 0)
+score = math.max(-6, math.min(6, rawScore))
+// Recent CLOSED bar confirmation; strong early calls cannot be based only on EMAs.
+upMomentum = close > close[1] and close > open
+downMomentum = close < close[1] and close < open
+// Reject extreme extension and fading price action, but do not apply v4's broad WAIT gates.
+stretch = atrValue > 0 ? (close - ema9) / atrValue : 0.0
+exhaustUp = useReversalGuard and (stretch > 2.5 or (rsiValue > 78 and close < close[1]))
+exhaustDown = useReversalGuard and (stretch < -2.5 or (rsiValue < 22 and close > close[1]))
+rangeTrapUp = inRange and nearResistance and not breakUp and close < close[1]
+rangeTrapDown = inRange and nearSupport and not breakDown and close > close[1]
+liquid = volRatio >= 0.55
+upAllowed = not exhaustUp and not rangeTrapUp and liquid
+downAllowed = not exhaustDown and not rangeTrapDown and liquid
+checkpoint = is1m and barstate.isconfirmed and slotMinute >= (allowVeryEarly ? 1 : 2) and slotMinute <= 5 and slotCall == "PENDING"
+// Dynamic decision. At 3m needs stronger evidence. 4m allows strong confirmations.
+// At 5-6m it accepts original v3 threshold, but guards price exhaustion/failed range edge.
+minNeeded = elapsed == 2 ? 6 : elapsed == 3 ? earlyScore : elapsed == 4 ? math.max(earlyScore, laterScore) : laterScore
+eligibleTime = elapsed != 4 or allowMinute4
+confirmedUp = elapsed <= 3 ? upMomentum : elapsed == 4 ? (upMomentum or bullPullback) : (upMomentum or bullPullback or score >= 5)
+confirmedDown = elapsed <= 3 ? downMomentum : elapsed == 4 ? (downMomentum or bearPullback) : (downMomentum or bearPullback or score <= -5)
+upNow = checkpoint and eligibleTime and score >= minNeeded and upAllowed and confirmedUp
+downNow = checkpoint and eligibleTime and score <= -minNeeded and downAllowed and confirmedDown
+// 6m deadline: output WAIT if no viable direction.
+finalWait = checkpoint and elapsed == 6 and not upNow and not downNow
+emit = upNow or downNow or finalWait
+if emit
+    slotCall := upNow ? "UP" : downNow ? "DOWN" : "WAIT"
+    calledAt := elapsed
+    nUp += upNow ? 1 : 0
+    nDown += downNow ? 1 : 0
+    nWait += finalWait ? 1 : 0
+    label.new(bar_index, upNow ? low : high, slotCall + " " + str.tostring(score) + " | " + str.tostring(elapsed) + "m", style=upNow ? label.style_label_up : label.style_label_down, color=upNow ? color.teal : downNow ? color.red : color.gray, textcolor=color.white, size=size.small)
+
+// Push a fresh one-minute snapshot after every closed candle, including after the first call.
+// The server retains the first call and separately tracks reversal warnings.
+// Alerts are live-only in TradingView; historical labels do NOT replay webhooks.
+monitor = is1m and barstate.isconfirmed and elapsed >= 2
+if monitor
+    eventType = emit ? "CALL" : "UPDATE"
+    body = '{"secret":"' + secret + '","event_type":"' + eventType + '","symbol":"' + syminfo.tickerid + '","bar_time_ms":' + str.tostring(time_close) + ',"signal":"' + slotCall + '","score":' + str.tostring(score) + ',"tv_price":' + str.tostring(close, format.mintick) + ',"tv_window_open":' + str.tostring(tvSlotOpen, format.mintick) + ',"ema9":' + str.tostring(ema9, format.mintick) + ',"ema20":' + str.tostring(ema20, format.mintick) + ',"vwap":' + str.tostring(vwapValue, format.mintick) + ',"rsi":' + str.tostring(rsiValue, "#.##") + ',"volume_ratio":' + str.tostring(volRatio, "#.##") + ',"trend5":' + str.tostring(trend5) + ',"decision_elapsed_minutes":' + str.tostring(elapsed) + ',"range_mode":' + (inRange ? "true" : "false") + ',"range_high":' + str.tostring(rangeHigh, format.mintick) + ',"range_low":' + str.tostring(rangeLow, format.mintick) + ',"exhaust_up":' + (exhaustUp ? "true" : "false") + ',"exhaust_down":' + (exhaustDown ? "true" : "false") + ',"up_momentum":' + (upMomentum ? "true" : "false") + ',"down_momentum":' + (downMomentum ? "true" : "false") + '}'
+    alert(body, alert.freq_once_per_bar_close)
+
+plot(is1m ? tvSlotOpen : na, "TV 15m start (not Kalshi)", color=color.yellow, linewidth=2, style=plot.style_stepline)
+plot(ema9, "EMA 9", color=color.aqua)
+plot(ema20, "EMA 20", color=color.orange)
+plot(vwapValue, "VWAP", color=color.new(color.blue, 30))
+plot(showLevels ? rangeHigh : na, "Range high (past bars)", color=color.new(color.red, 35))
+plot(showLevels ? rangeMid : na, "Range midpoint (past bars)", color=color.new(color.gray, 55))
+plot(showLevels ? rangeLow : na, "Range low (past bars)", color=color.new(color.green, 35))
+alertcondition(upNow, "Kalshi BTC v3.6 UP", "UP call on confirmed bar. Check live Kalshi asks and reference.")
+alertcondition(downNow, "Kalshi BTC v3.6 DOWN", "DOWN call on confirmed bar. Check live Kalshi asks and reference.")
+var table board = table.new(position.top_right, 2, 5, border_width=1)
+if barstate.islast and showBoard
+    table.cell(board, 0, 0, "KALSHI BTC v3.7", bgcolor=color.black, text_color=color.white)
+    table.cell(board, 1, 0, is1m ? slotCall : "USE 1m", bgcolor=slotCall == "UP" ? color.teal : slotCall == "DOWN" ? color.red : color.gray, text_color=color.white)
+    table.cell(board, 0, 1, "Call minute", text_color=color.white)
+    table.cell(board, 1, 1, na(calledAt) ? "PENDING" : str.tostring(calledAt) + "m", text_color=color.white)
+    table.cell(board, 0, 2, "Market", text_color=color.white)
+    table.cell(board, 1, 2, inRange ? "RANGE" : "TREND", text_color=color.white)
+    table.cell(board, 0, 3, "Score / TV start", text_color=color.white)
+    table.cell(board, 1, 3, str.tostring(score) + " / " + str.tostring(tvSlotOpen, format.mintick), text_color=color.white)
+    table.cell(board, 0, 4, "UP / DOWN / WAIT", text_color=color.white)
+    table.cell(board, 1, 4, str.tostring(nUp) + " / " + str.tostring(nDown) + " / " + str.tostring(nWait), text_color=color.white)

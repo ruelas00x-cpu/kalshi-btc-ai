@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0b111a"><meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>BTC 15m · Intelligence Monitor</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0b111a;color:#f5f7fb}
+*{box-sizing:border-box}body{margin:0 auto;max-width:640px;padding:16px 16px calc(32px + env(safe-area-inset-bottom));}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.eyebrow{color:#9caec4;font-size:12px;letter-spacing:1.7px;text-transform:uppercase}h1{font-size:25px;margin:3px 0;font-weight:750}.pill{font-size:12px;padding:7px 10px;border-radius:30px;background:#273344;color:#cad8e8;white-space:nowrap}.pill.live{background:#10372d;color:#66ecc2}.pill.error{background:#482629;color:#ff9c9c}
+.card{background:#15202d;border:1px solid #2b3849;border-radius:17px;padding:18px;margin:12px 0}.label{font-size:12px;letter-spacing:1px;color:#9bb0c4;text-transform:uppercase;margin-bottom:7px}.hero{font-size:32px;font-weight:800;letter-spacing:-.7px}.sub{color:#aab8c8;font-size:13px;line-height:1.5}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{padding:14px;background:#101a26;border:1px solid #2b3849;border-radius:12px}.number{font-size:26px;font-weight:750;margin:4px 0}.up{color:#65e6b1}.down{color:#ff9c9c}.muted{color:#aab8c8}.warning{color:#ffd68a}.divider{height:1px;background:#2a3848;margin:14px 0}.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:7px 0}.row span:first-child{color:#aab8c8}.row strong{text-align:right;font-variant-numeric:tabular-nums}.fine{font-size:12px;line-height:1.5;color:#9eafc1}.foot{font-size:12px;color:#8b9bac;line-height:1.6;margin:16px 0}.call{display:flex;gap:12px;align-items:center}.signal{border-radius:12px;background:#293646;padding:8px 14px;font-size:20px;font-weight:800}.signal.up{background:#10372d}.signal.down{background:#43272b}.stat{font-variant-numeric:tabular-nums}a{color:#a8cfff}button{width:100%;border:1px solid #40526a;border-radius:10px;background:#24364a;color:white;padding:12px;margin-top:8px;font-size:15px}
+
+.bigdecision{font-size:clamp(40px,11vw,67px);font-weight:850;letter-spacing:-2px;line-height:1.12;padding:7px 0}
+.bigdecision.up{color:#66ecc2}.bigdecision.down{color:#ff9c9c}.bigdecision.pass{color:#ffd68a}
+.lead{color:#ced9e7;font-size:14px;line-height:1.5}.mini-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.chip{background:#0d1622;border:1px solid #33465c;padding:9px 11px;border-radius:10px;font-size:12px;color:#cad7e6}
+summary{cursor:pointer;font-size:16px;font-weight:700;list-style-position:inside;padding:5px 0}details[open] summary{margin-bottom:12px}
+.scorebar{height:7px;border-radius:10px;background:#35475b;overflow:hidden;margin:9px 0 5px}.scorefill{height:100%;width:50%;background:#77aefb}
+
+.risk{margin-top:13px;padding:12px;border:1px solid #364c61;border-radius:12px;background:#172938;color:#bed2e5;font-size:13px;line-height:1.5}
+.risk.alert{background:#3b2623;border-color:#895c46;color:#ffd39b}
+.charttop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.charttop .sub{font-size:11px}
+#btcchart{display:block;width:100%;height:260px;border-radius:10px;background:#0d1723;border:1px solid #29394b}
+.legend{display:flex;gap:13px;flex-wrap:wrap;font-size:11px;margin:10px 0;color:#bac8d6}.lime{color:#68e8af}.orange{color:#f9bd70}.gold{color:#e5d27c}.blue{color:#7cb2f8}
+</style></head><body>
+<header><div><div class="eyebrow">Kalshi × TradingView</div><h1>BTC 15m · Live decision</h1></div><div id="health" class="pill">Connecting</div></header>
+<section class="card" aria-live="polite"><div class="label">CURRENT 15-MINUTE CONTRACT · EARLY-FIRST / LIVE RECHECK</div>
+<div class="bigdecision pass" id="call">PASS</div><div class="lead" id="callnote">Waiting for a matching TradingView call and a verified Kalshi quote.</div>
+<div class="mini-strip"><span class="chip">Up <b id="upshort">—</b></span><span class="chip">Down <b id="downshort">—</b></span><span class="chip">Time <b id="countdown">—</b></span></div>
+<div class="risk" id="risk">No active call · waiting for confirmation.</div><p class="fine">Directional watch only — NOT a verified profitable trade or an order. Late reversals can invalidate the original setup.</p></section>
+<section class="card"><div class="label">KALSHI MARKET</div><div id="market" class="sub">Searching for the current BTC 15-minute contract…</div>
+<div class="metrics" style="margin-top:14px"><div class="metric"><div class="label">Official reference</div><div class="number" id="strike">—</div><div class="fine" id="strikelabel">Not verified</div></div>
+<div class="metric"><div class="label">Last TradingView BTC</div><div class="number" id="tvprice">—</div><div class="fine">Different from settlement feed</div></div></div>
+<div class="divider"></div><div class="metrics"><div class="metric"><div class="label">UP / YES ask</div><div class="number up" id="yes">—</div><div class="fine" id="yesbe">Break-even —</div></div><div class="metric"><div class="label">DOWN / NO ask</div><div class="number down" id="no">—</div><div class="fine" id="nobe">Break-even —</div></div></div>
+<p class="fine">The reference is shown only if Kalshi publishes it. Break-even includes estimated fees, not a predicted chance of winning.</p></section>
+<section class="card" id="intelligenceSection">
+<div class="charttop"><div><div class="label">MARKET INTELLIGENCE ENGINE</div><h2 style="margin:0;font-size:20px">Independent confirmations</h2></div><div class="pill" id="engstate">Checking</div></div>
+<div class="metrics"><div class="metric"><div class="label">Candle analysis</div><div class="number" style="font-size:24px" id="engdir">—</div><div class="fine" id="engscore">No signal</div></div>
+<div class="metric"><div class="label">Market regime</div><div class="number" style="font-size:24px" id="engregime">—</div><div class="fine" id="engflow">Trade flow pending</div></div></div>
+<div class="risk" id="engwarnings">Waiting for completed BTC 1-minute candles.</div>
+<details style="margin-top:15px"><summary>7 strategies behind the call</summary><div id="strategies"></div></details>
+<div class="fine" style="margin-top:12px">Strategy votes are not trained win probabilities. Coinbase reported trade-side flow is not Kalshi settlement data. Disagreement triggers caution, not a retroactive change to the original call.</div>
+</section>
+<section class="card" id="chartSection">
+<div class="charttop"><div><div class="label">BTC / USD · 1-MINUTE PRICE ACTION</div><div class="sub">Coinbase spot candles · V3.7 TradingView signal overlay</div></div><div class="pill" id="charthealth">Loading</div></div>
+<canvas id="btcchart" width="700" height="390" aria-label="1-minute Bitcoin candlestick chart with EMA 9, EMA 20, Kalshi reference and TradingView call"></canvas>
+<div class="legend"><span class="lime">● EMA 9</span><span class="orange">● EMA 20</span><span class="gold">— Kalshi threshold</span><span class="blue">— TV window open</span></div>
+<p class="fine">The chart uses Coinbase BTC spot candles; the colored lines are reconstructed from those candles. The UP/DOWN markers are from your actual TradingView v3.7 webhook. This is <b>not</b> a native TradingView chart or Kalshi's settlement index.</p>
+</section>
+<details class="card"><summary>Why the indicator made this call</summary>
+<div class="row"><span>TradingView signal</span><strong id="signal">—</strong></div><div class="row"><span>Signal status</span><strong id="fresh">—</strong></div>
+<div class="row"><span>Trend score</span><strong id="score">—</strong></div><div class="row"><span>Confirmed 5m trend</span><strong id="trend">—</strong></div>
+<div class="row"><span>EMA 9 / EMA 20</span><strong id="emas">—</strong></div><div class="row"><span>VWAP</span><strong id="vwap">—</strong></div>
+<div class="row"><span>RSI / volume ratio</span><strong id="momentum">—</strong></div>
+<div class="row"><span>Market type</span><strong id="mode">—</strong></div><div class="row"><span>Range high / low</span><strong id="range">—</strong></div>
+<div class="row"><span>Call minute</span><strong id="minute">—</strong></div>
+<div class="row"><span>Contract volume</span><strong id="volume">—</strong></div>
+<div class="row"><span>Kalshi YES/NO bid depth ratio</span><strong id="depth">—</strong></div>
+<p class="fine">Order-book ratio measures resting Kalshi contract bids; it is not true BTC cumulative delta. The direction signal uses exchange-price proxies, not CF Benchmarks settlement data.</p>
+</details>
+<button onclick="refresh()">Refresh now</button><p class="foot" id="lastupdate">No refresh yet</p><p class="foot">No model-calibrated win probability is available. A break-even probability is the minimum needed to cover purchase price and estimated fees, not the chance the contract will win.</p>
+<section class="card" aria-label="Research training status">
+<div class="label">Automatic learning · Research mode</div>
+<div class="metrics"><div class="metric"><div class="label">Observed contracts</div><div class="number" id="nobserved">—</div></div>
+<div class="metric"><div class="label">Official settlements matched</div><div class="number" id="nsettled">—</div></div></div>
+<div class="row"><span>Eligible labeled contracts</span><strong id="nusable">—</strong></div>
+<div class="row"><span>Model status</span><strong id="nmodel">Not trained</strong></div>
+<div class="row"><span>Chronological holdout Brier</span><strong id="nbrier">—</strong></div>
+<p class="fine" id="ntrainnote">Candidate model never controls a BUY/SELL signal. Requires 250+ settled, usable contracts, including a later-period test set.</p>
+</section>
+<script>
+const by=id=>document.getElementById(id);
+const fmt=x=>x===null||x===undefined||x===''?'—':String(x);
+const usd=x=>x===null||x===undefined||x===''?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(x));
+const cents=x=>x==null?'—':(Number(x)*100).toFixed(1)+'¢';
+const pct=x=>x==null?'—':(Number(x)*100).toFixed(1)+'%';
+let deadline=null;let lastStatus=null;let chartRows=[];
+function clock(){if(deadline){const n=Math.max(0,Math.ceil((deadline-Date.now())/1000));by('countdown').textContent=Math.floor(n/60)+':'+String(n%60).padStart(2,'0');if(n===0){by('call').textContent='PASS';by('call').className='bigdecision pass';by('callnote').textContent='Contract window ended. Refreshing the next contract.';}}}
+setInterval(clock,1000);
+function setDecision(s){
+ const k=s.kalshi,t=s.tradingview,d=s.decision||'';
+ const valid=k&&t&&t.fresh&&k.seconds_left>=180&&d.startsWith('WATCH ')&&
+  ((t.original_call==='UP'&&k.yes_up?.ask!=null)||(t.original_call==='DOWN'&&k.no_down?.ask!=null));
+ const side=valid?t.original_call:null;const cautious=s.risk_state==='CAUTION';
+ by('call').textContent=cautious?'CAUTION':side==='UP'?'WATCH UP':side==='DOWN'?'WATCH DOWN':'PASS';
+ by('call').className='bigdecision '+(cautious?'pass':side==='UP'?'up':side==='DOWN'?'down':'pass');
+ by('callnote').textContent=cautious?'Original call: '+(t?.original_call||'—')+' · conditions have weakened.':valid?'Original call '+side+' at minute '+(t?.call_at||'—')+'. Rechecking each minute.':'No current confirmed setup with verified live quotes.';
+ const notes=s.warnings||[];by('risk').textContent=notes.length?notes.join(' · '):'No reversal warning currently detected; risk remains.';
+ by('risk').className='risk'+(notes.length?' alert':'');
+}
+function ema(values,n){let avg=values[0],a=2/(n+1);return values.map((v,i)=>avg=i===0?v:(a*v+(1-a)*avg));}
+function drawChart(){
+ const c=by('btcchart'),r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+ c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);const g=c.getContext('2d');g.scale(dpr,dpr);
+ const w=r.width,h=r.height;g.fillStyle='#0d1723';g.fillRect(0,0,w,h);
+ let rows=chartRows.slice(-60); if(rows.length<3){g.fillStyle='#9bb0c4';g.font='13px sans-serif';g.fillText('Waiting for Coinbase 1-minute price data',15,35);return;}
+ const left=8,right=53,top=12,bottom=29,pw=w-left-right,ph=h-top-bottom;
+ const strike=lastStatus?.kalshi?.reference_is_verified?Number(lastStatus.kalshi.kalshi_reference_strike):null;
+ const tvOpen=lastStatus?.tradingview?.tv_window_open?Number(lastStatus.tradingview.tv_window_open):null;
+ let low=Math.min(...rows.map(v=>v.low),...(strike!=null?[strike]:[]),...(tvOpen!=null?[tvOpen]:[]));
+ let high=Math.max(...rows.map(v=>v.high),...(strike!=null?[strike]:[]),...(tvOpen!=null?[tvOpen]:[]));let pad=(high-low)*.08||25;low-=pad;high+=pad;
+ const y=v=>top+(high-v)/(high-low)*ph,x=i=>left+(i+.5)/rows.length*pw;
+ g.strokeStyle='#263a4c';g.lineWidth=1;g.font='10px system-ui';g.fillStyle='#8aa4bb';
+ for(let z=0;z<=4;z++){let yy=top+z*ph/4;g.beginPath();g.moveTo(left,yy);g.lineTo(w-right+5,yy);g.stroke();g.fillText((high-z*(high-low)/4).toFixed(0),w-right+8,yy+3);}
+ function horizontal(v,color,label){if(v==null||!Number.isFinite(v))return;let yy=y(v);g.strokeStyle=color;g.setLineDash([5,4]);g.beginPath();g.moveTo(left,yy);g.lineTo(w-right,yy);g.stroke();g.setLineDash([]);g.fillStyle=color;g.fillText(label,left+4,Math.max(11,yy-5));}
+ horizontal(tvOpen,'#79aff4','TV OPEN');horizontal(strike,'#e6d17b','KALSHI THRESHOLD');
+ let body=Math.max(2,pw/rows.length*.52);
+ rows.forEach((v,i)=>{let xx=x(i),green=v.close>=v.open;g.strokeStyle=green?'#53d9a5':'#ff7e83';g.fillStyle=g.strokeStyle;g.beginPath();g.moveTo(xx,y(v.high));g.lineTo(xx,y(v.low));g.stroke();g.fillRect(xx-body/2,Math.min(y(v.open),y(v.close)),body,Math.max(1,Math.abs(y(v.close)-y(v.open))));});
+ const all=chartRows.map(v=>v.close),full9=ema(all,9),full20=ema(all,20);const offset=chartRows.length-rows.length;
+ for(let [values,color] of [[full9,'#6de3b7'],[full20,'#ffb36d']]){g.strokeStyle=color;g.lineWidth=1.6;g.beginPath();rows.forEach((v,i)=>{let yy=y(values[offset+i]);if(i===0)g.moveTo(x(i),yy);else g.lineTo(x(i),yy)});g.stroke();}
+ let t=lastStatus?.tradingview;
+ if(t?.original_call&&['UP','DOWN'].includes(t.original_call)&&t.bar_time_ms){let stamp=Math.floor(Number(t.bar_time_ms)/1000),i=rows.findIndex(v=>v.time===Math.floor((stamp-1)/60)*60);if(i>=0){let yy=y(rows[i].close);g.fillStyle=t.original_call==='UP'?'#4ce0a7':'#ff8c91';g.beginPath();g.arc(x(i),yy,5,0,Math.PI*2);g.fill();g.font='bold 11px sans-serif';g.fillText(t.original_call,x(i)+7,yy-9);}}
+ g.font='10px system-ui';g.fillStyle='#9bb0c4';[0,15,30,45,59].forEach(i=>{if(i<rows.length){let dt=new Date(rows[i].time*1000);g.fillText(dt.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),Math.max(4,x(i)-12),h-9);}});
+}
+async function refreshCandles(){try{const r=await fetch('/candles',{cache:'no-store'});if(!r.ok)throw Error('Unavailable');const d=await r.json();chartRows=d.candles||[];by('charthealth').textContent='1m candles';by('charthealth').className='pill live';drawChart();}catch(e){by('charthealth').textContent='Chart offline';by('charthealth').className='pill error';drawChart();}}
+window.addEventListener('resize',drawChart);
+async function refresh(){try{
+ const r=await fetch('/status',{cache:'no-store'});if(!r.ok)throw Error('Server returned '+r.status);const s=await r.json();
+ by('health').className='pill live';by('health').textContent='Connected';
+ lastStatus=s;const k=s.kalshi,t=s.tradingview;deadline=k?.close_time?Date.parse(k.close_time):null;
+ if(k){by('market').textContent=k.title||k.ticker;by('strike').textContent=k.reference_is_verified?usd(k.kalshi_reference_strike):'Unavailable';by('strike').style.fontSize=k.reference_is_verified?'25px':'18px';by('strikelabel').textContent=k.reference_is_verified?'Kalshi published threshold':'Check in Kalshi';by('yes').textContent=cents(k.yes_up?.ask);by('no').textContent=cents(k.no_down?.ask);by('upshort').textContent=cents(k.yes_up?.ask);by('downshort').textContent=cents(k.no_down?.ask);by('yesbe').textContent='Break-even '+pct(k.yes_up?.break_even_probability);by('nobe').textContent='Break-even '+pct(k.no_down?.break_even_probability);by('volume').textContent=fmt(k.volume);by('depth').textContent=fmt(k.orderbook?.contract_bid_depth_ratio);}else{by('market').textContent='No currently verified Kalshi BTC contract';for(const id of ['strike','yes','no','upshort','downshort','volume','depth','countdown'])by(id).textContent='—';}
+ by('signal').textContent=fmt(t?.signal);by('fresh').textContent=t?(t.fresh?'Fresh · '+fmt(t.age_seconds)+'s old':'Stale · '+fmt(t.age_seconds)+'s old'):'Not received';
+ by('score').textContent=fmt(t?.score);by('trend').textContent=t?.trend5===1||t?.trend5==='1'?'Bullish':t?.trend5===-1||t?.trend5==='-1'?'Bearish':'—';
+ by('tvprice').textContent=usd(t?.tv_price);by('emas').textContent=usd(t?.ema9)+' / '+usd(t?.ema20);by('vwap').textContent=usd(t?.vwap);
+ by('momentum').textContent=t?fmt(t.rsi)+' / '+fmt(t.volume_ratio)+'×':'—';by('mode').textContent=t?(t.range_mode===true||t.range_mode==='true'?'Range':'Trend / undetermined'):'—';
+ by('range').textContent=usd(t?.range_high)+' / '+usd(t?.range_low);by('minute').textContent=t?.decision_elapsed_minutes!=null?fmt(t.decision_elapsed_minutes)+'m':'—';
+ const intel=s.intelligence||{};
+ by('engstate').textContent=intel.state||'OFFLINE';by('engstate').className='pill'+(intel.state==='CONFIRMED'?' live':intel.state==='CONFLICT'?' error':'');
+ by('engdir').textContent=intel.direction||'—';by('engdir').className='number '+(intel.direction==='UP'?'up':intel.direction==='DOWN'?'down':'muted');
+ by('engscore').textContent=intel.fresh?'Directional vote margin '+fmt(intel.margin_score)+' · '+(intel.agreement_with_tv?'TV agrees':'TV not confirmed'):'No fresh confirmed bars';
+ by('engregime').textContent=intel.market_type||'—';by('engflow').textContent='Trade-side flow: '+(intel.flow_status||'not connected');
+ let ew=intel.warnings||[];by('engwarnings').textContent=ew.length?ew.join(' · '):intel.reason||'No additional warnings from the independent engine.';
+ by('engwarnings').className='risk'+(ew.length?' alert':'');
+ by('strategies').replaceChildren();for(const st of (intel.strategies||[])){
+   const item=document.createElement('div');item.className='row';
+   const name=document.createElement('span');name.textContent=st.name+' (×'+st.weight+')';
+   const result=document.createElement('strong');result.textContent=st.direction;
+   result.className=st.direction==='UP'?'up':st.direction==='DOWN'?'down':'muted';
+   item.append(name,result);by('strategies').appendChild(item);
+   const detail=document.createElement('div');detail.className='fine';detail.textContent=st.why;by('strategies').appendChild(detail);
+ }
+ setDecision(s);drawChart();by('lastupdate').textContent='Updated '+new Date().toLocaleTimeString()+(s.kalshi_error?' · Kalshi connection issue':'');clock();
+ }catch(e){by('health').className='pill error';by('health').textContent='Offline';by('call').textContent='PASS';by('call').className='bigdecision pass';by('callnote').textContent='Live connection unavailable; do not use previous signals.';by('lastupdate').textContent=e.message;}}
+async function refreshTraining(){try{const r=await fetch('/training-status',{cache:'no-store'});if(!r.ok)throw Error('not available');const t=await r.json();
+by('nobserved').textContent=t.observed_markets;by('nsettled').textContent=t.settled_markets;
+by('nusable').textContent=t.trainable_markets;by('nmodel').textContent=t.model_status;
+by('nbrier').textContent=t.metrics?.brier==null?'—':String(t.metrics.brier)+' (baseline '+t.metrics.baseline_brier+')';
+by('ntrainnote').textContent=t.metrics?.warning||'Research only. Model does not control any live trading calls.';
+}catch(e){by('ntrainnote').textContent='Training status unavailable';}}
+refreshTraining();setInterval(refreshTraining,60000);
+refresh();refreshCandles();setInterval(refresh,10000);setInterval(refreshCandles,30000);
+</script></body></html>
